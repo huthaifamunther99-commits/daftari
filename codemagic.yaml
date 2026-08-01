@@ -1,20 +1,27 @@
 workflows:
   android-workflow:
-    name: Android Build
+    name: Android Build (دفتري)
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
       node: 20
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
     scripts:
-      - name: Install deps
+      - name: تثبيت الحزم
         script: npm install
-      - name: Build web
+      - name: بناء ملفات الويب
         script: npm run build
-      - name: Add Android
+      - name: إضافة منصة Android (أول مرة فقط)
         script: npx cap add android || true
-      - name: Sync
+      - name: مزامنة Capacitor
         script: npx cap sync android
-      - name: Build APK
+      - name: بناء APK
         script: |
           cd android
           chmod +x ./gradlew
@@ -23,41 +30,52 @@ workflows:
       - android/app/build/outputs/**/*.apk
 
   ios-workflow:
-    name: iOS Build
+    name: iOS Build (دفتري)
     max_build_duration: 90
     instance_type: mac_mini_m2
     environment:
       node: 20
       ios_signing:
         distribution_type: app_store
+        # غيّر هذا لنفس القيمة اللي حطيتها بـ capacitor.config.json
         bundle_identifier: com.yourcompany.daftari
       vars:
         XCODE_WORKSPACE: "ios/App/App.xcworkspace"
         XCODE_SCHEME: "App"
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
     integrations:
+      # لازم تضيف مفتاح App Store Connect API من إعدادات Codemagic
+      # وتسمّيه بنفس هذا الاسم، أو تغيّر الاسم هون ليطابق
       app_store_connect: codemagic_api_key
     scripts:
-      - name: Install deps
+      - name: تثبيت الحزم
         script: npm install
-      - name: Build web
+      - name: بناء ملفات الويب
         script: npm run build
-      - name: Add iOS
+      - name: إضافة منصة iOS (أول مرة فقط)
         script: npx cap add ios || true
-      - name: Sync
+      - name: مزامنة Capacitor
         script: npx cap sync ios
-      - name: Pods
+      - name: تثبيت CocoaPods
         script: |
           cd ios/App
           pod install
-      - name: Signing
+      - name: إعداد توقيع الكود تلقائيًا
         script: xcode-project use-profiles
-      - name: Build ipa
+      - name: بناء ملف ipa
         script: |
           xcode-project build-ipa \
             --workspace "$XCODE_WORKSPACE" \
             --scheme "$XCODE_SCHEME"
     artifacts:
       - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
     publishing:
       app_store_connect:
         auth: integration
