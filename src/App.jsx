@@ -202,7 +202,11 @@ export default function App() {
           }}
         />
       )}
-    </div>function Ledger({ namespace, title }) {
+    </div>
+    );
+}
+    
+    function Ledger({ namespace, title }) {
   const [transactions, setTransactions] = useState(null);
   const [reminders, setReminders] = useState(null);
   const [openingBalance, setOpeningBalance] = useState(null);
