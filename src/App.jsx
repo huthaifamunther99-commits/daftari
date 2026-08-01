@@ -39,7 +39,6 @@ const fmt = (n) =>
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const uid = () => Math.random().toString(36).slice(2, 10);
 
-// مفتاح تخزين يأخذ بعين الاعتبار المساحة (شخصي أو محل معيّن)
 function nsKey(namespace, key) {
   return namespace ? `store:${namespace}:${key}` : key;
 }
@@ -89,9 +88,7 @@ export default function App() {
     }
   }
 
-  const activeStore = (stores || []).find((s) => s.id === activeStoreId);
-
-  return (
+  const activeStore = (stores || []).find((s) => s.id === activeStoreId);return (
     <div dir="rtl" lang="ar" style={styles.appShell}>
       <FontLoader />
       <div style={styles.stitchTop} />
@@ -203,10 +200,8 @@ export default function App() {
         />
       )}
     </div>
-    );
-}
-    
-    function Ledger({ namespace, title }) {
+  );
+            }function Ledger({ namespace, title }) {
   const [transactions, setTransactions] = useState(null);
   const [reminders, setReminders] = useState(null);
   const [openingBalance, setOpeningBalance] = useState(null);
@@ -306,8 +301,7 @@ export default function App() {
       try {
         await window.storage.set(nsKey(namespace, "expenseAdjustment"), JSON.stringify(expenseAdjustment));
       } catch (e) {}
-    })();
-  }, [expenseAdjustment, loaded, namespace]);
+    })();}, [expenseAdjustment, loaded, namespace]);
 
   function seedData() {
     const d = new Date();
@@ -319,7 +313,204 @@ export default function App() {
     return [
       { id: uid(), type: "income", amount: 650, category: "راتب", note: "راتب الشهر", date: iso(28) },
       { id: uid(), type: "expense", amount: 220, category: "سكن", note: "إيجار", date: iso(27) },
-      { id: uid(), type: "expense",return (
+      { id: uid(), type: "expense", amount: 45, category: "طعام", note: "بقالة الأسبوع", date: iso(20) },
+      { id: uid(), type: "expense", amount: 25, category: "مواصلات", note: "بنزين", date: iso(15) },
+      { id: uid(), type: "income", amount: 60, category: "مبيعات", note: "بيع أغراض مستعملة", date: iso(12) },
+      { id: uid(), type: "expense", amount: 12, category: "ترفيه", note: "سينما", date: iso(8) },
+      { id: uid(), type: "expense", amount: 38, category: "فواتير", note: "كهرباء وماء", date: iso(5) },
+      { id: uid(), type: "expense", amount: 30, category: "تسوق", note: "ملابس", date: iso(2) },
+    ];
+  }
+
+  function seedReminders() {
+    return [
+      { id: uid(), name: "إيجار الشقة", amount: 220, category: "سكن", dueDay: 1, lastPaidMonth: null },
+      { id: uid(), name: "فاتورة الإنترنت", amount: 18, category: "فواتير", dueDay: 5, lastPaidMonth: null },
+      { id: uid(), name: "اشتراك الجيم", amount: 25, category: "صحة", dueDay: 10, lastPaidMonth: null },
+    ];
+  }
+
+  function showToast(msg) {
+    setToast(msg);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2200);
+  }
+
+  function addTransaction(tx) {
+    setTransactions((prev) => [{ ...tx, id: uid() }, ...(prev || [])]);
+    showToast(tx.type === "income" ? "تم تسجيل الدخل" : "تم تسجيل المصروف");
+  }
+
+  function updateTransaction(id, tx) {
+    setTransactions((prev) => prev.map((t) => (t.id === id ? { ...t, ...tx } : t)));
+    showToast("تم حفظ التعديلات");
+  }
+
+  function deleteTransaction(id) {
+    setTransactions((prev) => prev.filter((t) => t.id !== id));
+    showToast("تم حذف القيد");
+  }
+
+  function addReminder(rem) {
+    setReminders((prev) => [...(prev || []), { ...rem, id: uid(), lastPaidMonth: null }]);
+    showToast("تمت إضافة التذكير");
+  }
+
+  function updateReminder(id, rem) {
+    setReminders((prev) => prev.map((r) => (r.id === id ? { ...r, ...rem } : r)));
+    showToast("تم حفظ التعديلات");
+  }
+
+  function deleteReminder(id) {
+    setReminders((prev) => prev.filter((r) => r.id !== id));
+    showToast("تم حذف التذكير");
+  }
+
+  function markReminderPaid(rem) {
+    const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    setReminders((prev) => prev.map((r) => (r.id === rem.id ? { ...r, lastPaidMonth: key } : r)));
+    addTransaction({
+      type: "expense",
+      amount: rem.amount,
+      category: rem.category,
+      note: rem.name,
+      date: todayISO(),
+    });
+  }
+
+  const sorted = useMemo(
+    () => [...(transactions || [])].sort((a, b) => (a.date < b.date ? 1 : -1)),
+    [transactions]
+  );
+
+  const totals = useMemo(() => {
+    let txIncome = 0, txExpense = 0;
+    (transactions || []).forEach((t) => {
+      if (t.type === "income") txIncome += Number(t.amount);
+      else txExpense += Number(t.amount);
+    });
+    const income = txIncome + (incomeAdjustment || 0);
+    const expense = txExpense + (expenseAdjustment || 0);
+    return { income, expense, balance: (openingBalance || 0) + income - expense };
+  }, [transactions, openingBalance, incomeAdjustment, expenseAdjustment]);function setBalance(desired) {
+    const netFromTotals = totals.income - totals.expense;
+    setOpeningBalance(desired - netFromTotals);
+    showToast("تم تحديث الرصيد الحالي");
+  }
+
+  function setIncome(desired) {
+    const txIncome = totals.income - (incomeAdjustment || 0);
+    setIncomeAdjustment(desired - txIncome);
+    showToast("تم تحديث إجمالي الدخل");
+  }
+
+  function setExpense(desired) {
+    const txExpense = totals.expense - (expenseAdjustment || 0);
+    setExpenseAdjustment(desired - txExpense);
+    showToast("تم تحديث إجمالي المصروفات");
+  }
+
+  const now = new Date();
+  const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastMonthKey = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, "0")}`;
+
+  const monthTx = (key) => (transactions || []).filter((t) => t.date.slice(0, 7) === key);
+
+  const thisMonthExpense = useMemo(
+    () => monthTx(thisMonthKey).filter((t) => t.type === "expense").reduce((s, t) => s + Number(t.amount), 0),
+    [transactions]
+  );
+  const lastMonthExpense = useMemo(
+    () => monthTx(lastMonthKey).filter((t) => t.type === "expense").reduce((s, t) => s + Number(t.amount), 0),
+    [transactions]
+  );
+  const thisMonthIncome = useMemo(
+    () => monthTx(thisMonthKey).filter((t) => t.type === "income").reduce((s, t) => s + Number(t.amount), 0),
+    [transactions]
+  );
+
+  const categoryBreakdown = useMemo(() => {
+    const map = {};
+    (transactions || [])
+      .filter((t) => t.type === "expense")
+      .forEach((t) => {
+        map[t.category] = (map[t.category] || 0) + Number(t.amount);
+      });
+    return Object.entries(map)
+      .map(([name, value]) => ({ name, value, color: catMeta(name).color }))
+      .sort((a, b) => b.value - a.value);
+  }, [transactions]);
+
+  const topCategory = categoryBreakdown[0];
+  const momChange = lastMonthExpense > 0
+    ? Math.round(((thisMonthExpense - lastMonthExpense) / lastMonthExpense) * 100)
+    : null;
+  const savingsRate = thisMonthIncome > 0
+    ? Math.round(((thisMonthIncome - thisMonthExpense) / thisMonthIncome) * 100)
+    : null;
+
+  const weeklyBars = useMemo(() => {
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      const dayLabel = ["أحد","اثنين","ثلاثاء","أربعاء","خميس","جمعة","سبت"][d.getDay()];
+      const exp = (transactions || []).filter((t) => t.date === key && t.type === "expense")
+        .reduce((s, t) => s + Number(t.amount), 0);
+      days.push({ day: dayLabel, exp });
+    }
+    return days;
+  }, [transactions]);
+
+  const filtered = useMemo(() => {
+    return sorted.filter((t) => {
+      if (filterType !== "all" && t.type !== filterType) return false;
+      if (filterCat !== "all" && t.category !== filterCat) return false;
+      if (search && !(`${t.note} ${t.category}`.toLowerCase().includes(search.toLowerCase()))) return false;
+      return true;
+    });
+  }, [sorted, filterType, filterCat, search]);
+
+  const withRunning = useMemo(() => {
+    const chronological = [...(transactions || [])].sort((a, b) => (a.date > b.date ? 1 : -1));
+    const balanceAt = {};
+    let running = 0;
+    chronological.forEach((t) => {
+      running += t.type === "income" ? Number(t.amount) : -Number(t.amount);
+      balanceAt[t.id] = running;
+    });
+    return filtered.map((t) => ({ ...t, running: balanceAt[t.id] }));
+  }, [filtered, transactions]);
+
+  const reminderStatus = useMemo(() => {
+    const list = (reminders || []).map((r) => {
+      const paid = r.lastPaidMonth === thisMonthKey;
+      const daysUntil = r.dueDay - now.getDate();
+      let state = "upcoming";
+      if (paid) state = "paid";
+      else if (daysUntil < 0) state = "overdue";
+      else if (daysUntil <= 5) state = "soon";
+      return { ...r, paid, daysUntil, state };
+    });
+    const order = { overdue: 0, soon: 1, upcoming: 2, paid: 3 };
+    list.sort((a, b) => order[a.state] - order[b.state] || a.daysUntil - b.daysUntil);
+    return list;
+  }, [reminders, thisMonthKey]);
+
+  const urgentCount = reminderStatus.filter((r) => r.state === "overdue" || r.state === "soon").length;
+
+  if (!loaded || transactions === null || reminders === null || openingBalance === null || incomeAdjustment === null || expenseAdjustment === null) {
+    return (
+      <div style={styles.loadingScreen}>
+        <div style={styles.loadingMark}>د</div>
+        <div style={{ fontFamily: "Tajawal, sans-serif", color: "#12312A", fontSize: 15 }}>
+          جارِ فتح الدفتر…
+        </div>
+      </div>
+    );
+                                                                           }return (
     <div style={styles.ledgerRoot}>
       <div style={styles.ledgerToolbar}>
         <span style={styles.ledgerTitle}>{title}</span>
@@ -478,8 +669,7 @@ export default function App() {
         </div>
       </section>
 
-      <section style={styles.controls}>
-        <div style={styles.searchBox}>
+      <section style={styles.controls}><div style={styles.searchBox}>
           <Search size={17} color="#5A6B5F" />
           <input placeholder="ابحث في القيود…" value={search} onChange={(e) => setSearch(e.target.value)} style={styles.searchInput} />
         </div>
@@ -611,9 +801,7 @@ export default function App() {
       {toast && <div style={styles.toast}>{toast}</div>}
     </div>
   );
-        }
-  );
-}function SummaryCard({ label, value, icon: Icon, tone, editable, onEdit }) {
+            }function SummaryCard({ label, value, icon: Icon, tone, editable, onEdit }) {
   const toneStyles = {
     ink: { bg: "#12312A", fg: "#F1F4F0", accent: "#C9A227" },
     income: { bg: "#FFFFFF", fg: "#2F6F4E", accent: "#2F6F4E" },
@@ -780,9 +968,7 @@ function ReminderForm({ initial, onClose, onSubmit, onDelete }) {
       </div>
     </div>
   );
-}
-
-function AmountEditForm({ title, hint, current, onClose, onSubmit }) {
+                     }function AmountEditForm({ title, hint, current, onClose, onSubmit }) {
   const [value, setValue] = useState(String(Math.round(current * 100) / 100));
   const [error, setError] = useState("");
 
@@ -935,8 +1121,7 @@ const styles = {
   ledgerRoot: { paddingBottom: 40 },
   ledgerToolbar: {
     display: "flex", alignItems: "center", justifyContent: "space-between",
-    padding: "16px 20px 0",
-  },
+    padding: "16px 20px 0",},
   ledgerTitle: { fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 17, color: "#12312A" },
   addBtn: {
     display: "flex", alignItems: "center", gap: 6,
@@ -1021,16 +1206,6 @@ const styles = {
   overlay: {
     position: "fixed", inset: 0, background: "rgba(18,49,42,0.45)",
     display: "flex", alignItems: "flex-end", justifyContent: "center",
-    zIndex: 50, backdropFilter: "blur(2px)",
-  },
-  modal: {
-    background: "#F7F9F6", width: "100%", maxWidth: 460,
-    borderRadius: "20px 20px 0 0", padding: "18px 20px 24px",
-    maxHeight: "88vh", overflowY: "auto", fontFamily: "Tajawal, sans-serif",
-  },
-  modalHead: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
-  closeBtn: { border: "none", background: "#EDF1EA", borderRadius: 8, padding: 6, cursor: "pointer", color: "#5A6B5F" },
-  typeToggle: { display: "flex", gap: 8, background: "#EDF1EA", display: "flex", alignItems: "flex-end", justifyContent: "center",
     zIndex: 50, backdropFilter: "blur(2px)",
   },
   modal: {
