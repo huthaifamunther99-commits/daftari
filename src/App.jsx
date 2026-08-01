@@ -1135,7 +1135,7 @@ const styles = {
     fontFamily: "Tajawal, sans-serif", whiteSpace: "nowrap",
   },
   payBtn: {
-    bord er: "1px solid #2F6F4E", background: "#2F6F4E0F", color: "#2F6F4E",
+    border: "1px solid #2F6F4E", background: "#2F6F4E0F", color: "#2F6F4E",
     borderRadius: 8, padding: "5px 10px", fontSize: 11.5, fontWeight: 700,
     fontFamily: "Tajawal, sans-serif", cursor: "pointer", whiteSpace: "nowrap",
   },
