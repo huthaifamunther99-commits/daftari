@@ -1146,6 +1146,33 @@ function NameEditForm({ title, hint, label, placeholder, onClose, onSubmit }) {
 }
 
 function SettingsPanel({ currency, onChangeCurrency, onClose }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  async function handleBackup() {
+    setBusy(true);
+    setMsg("");
+    try {
+      await backupData({});
+      setMsg("تم رفع النسخة الاحتياطية بنجاح");
+    } catch (e) {
+      setMsg("حدث خطأ أثناء النسخ الاحتياطي");
+    }
+    setBusy(false);
+  }
+
+  async function handleRestore() {
+    setBusy(true);
+    setMsg("");
+    try {
+      const ok = await restoreData();
+      if (!ok) setMsg("لا توجد نسخة احتياطية محفوظة");
+    } catch (e) {
+      setMsg("حدث خطأ أثناء الاستعادة");
+    }
+    setBusy(false);
+  }
+
   return (
     <div style={styles.overlay} onClick={onClose}>
       <div style={styles.modal} onClick={(e) => e.stopPropagation()} dir="rtl">
@@ -1157,6 +1184,14 @@ function SettingsPanel({ currency, onChangeCurrency, onClose }) {
         <label style={styles.label}>العملة</label>
         <Dropdown value={currency} onChange={onChangeCurrency} options={CURRENCY_OPTIONS} />
 
+        <label style={{ ...styles.label, marginTop: 22 }}>النسخ الاحتياطي</label>
+        <button style={styles.submitBtn} onClick={handleBackup} disabled={busy}>
+          {busy ? "جارٍ التنفيذ..." : "رفع نسخة احتياطية الآن"}
+        </button>
+        <button style={{ ...styles.submitBtn, marginTop: 10, background: "#5A6B5F" }} onClick={handleRestore} disabled={busy}>
+          استعادة آخر نسخة احتياطية
+        </button>
+        {msg && <div style={{ fontSize: 13.5, color: "#5A6B5F", marginTop: 8, textAlign: "center" }}>{msg}</div>}
         <label style={{ ...styles.label, marginTop: 22 }}>المظهر</label>
         <div style={styles.comingSoonBox}>
           الوضع الداكن قيد التجهيز — رح يوصلك بتحديث قريب.
