@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useContext } from "react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as ReTooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -7,7 +7,7 @@ import {
   Plus, TrendingUp, TrendingDown, Wallet, Trash2, Search,
   X, Coins, Utensils, Car, Home, Zap, ShoppingBag, HeartPulse,
   Film, Briefcase, PiggyBank, MoreHorizontal, Sparkles,
-  Bell, CheckCircle2, AlertTriangle, Store, User, ChevronLeft, ChevronDown,
+  Bell, CheckCircle2, AlertTriangle, Store, User, ChevronLeft, ChevronDown, Menu,
 } from "lucide-react";
 
 const INCOME_CATS = [
@@ -31,7 +31,18 @@ const EXPENSE_CATS = [
 const ALL_CATS = [...INCOME_CATS, ...EXPENSE_CATS];
 const catMeta = (name) => ALL_CATS.find((c) => c.id === name) || ALL_CATS[ALL_CATS.length - 1];
 
-const CURRENCY = "د.أ";
+const DEFAULT_CURRENCY = "د.أ";
+const CURRENCY_OPTIONS = [
+  { value: "د.أ", label: "دينار أردني (د.أ)" },
+  { value: "$", label: "دولار أمريكي ($)" },
+  { value: "ر.س", label: "ريال سعودي (ر.س)" },
+  { value: "ج.م", label: "جنيه مصري (ج.م)" },
+  { value: "د.إ", label: "درهم إماراتي (د.إ)" },
+  { value: "د.ك", label: "دينار كويتي (د.ك)" },
+  { value: "ل.ل", label: "ليرة لبنانية (ل.ل)" },
+  { value: "€", label: "يورو (€)" },
+];
+const CurrencyContext = React.createContext(DEFAULT_CURRENCY);
 
 const fmt = (n) =>
   new Intl.NumberFormat("ar-JO", { minimumFractionDigits: 2, maximumFractionDigits: 3 }).format(Math.abs(n));
@@ -48,6 +59,25 @@ export default function App() {
   const [stores, setStores] = useState(null); // null = loading
   const [activeStoreId, setActiveStoreId] = useState(null);
   const [showAddStore, setShowAddStore] = useState(false);
+  const [currency, setCurrency] = useState(DEFAULT_CURRENCY);
+  const [showSettings, setShowSettings] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await window.storage.get("currency");
+        if (res && res.value) setCurrency(JSON.parse(res.value));
+      } catch (e) {}
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        await window.storage.set("currency", JSON.stringify(currency));
+      } catch (e) {}
+    })();
+  }, [currency]);
 
   useEffect(() => {
     (async () => {
@@ -88,12 +118,16 @@ export default function App() {
     }
   }
 
-  const activeStore = (stores || []).find((s) => s.id === activeStoreId);return (
+  const activeStore = (stores || []).find((s) => s.id === activeStoreId);
+
+  return (
+    <CurrencyContext.Provider value={currency}>
     <div dir="rtl" lang="ar" style={styles.appShell}>
       <FontLoader />
-      <div style={styles.stitchTop} />
-
-      <header style={styles.appHeader}>
+      <div style={styles.stitchTop} /><header style={styles.appHeader}>
+        <button style={styles.menuBtn} onClick={() => setShowSettings(true)} aria-label="الإعدادات">
+          <Menu size={22} color="#12312A" />
+        </button>
         <div style={styles.brand}>
           <div style={styles.brandMark}>د</div>
           <div>
@@ -199,9 +233,19 @@ export default function App() {
           }}
         />
       )}
+
+      {showSettings && (
+        <SettingsPanel
+          currency={currency}
+          onChangeCurrency={setCurrency}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
     </div>
+    </CurrencyContext.Provider>
   );
-            }function Ledger({ namespace, title }) {
+}function Ledger({ namespace, title }) {
+  const currency = useContext(CurrencyContext);
   const [transactions, setTransactions] = useState(null);
   const [reminders, setReminders] = useState(null);
   const [openingBalance, setOpeningBalance] = useState(null);
@@ -301,7 +345,8 @@ export default function App() {
       try {
         await window.storage.set(nsKey(namespace, "expenseAdjustment"), JSON.stringify(expenseAdjustment));
       } catch (e) {}
-    })();}, [expenseAdjustment, loaded, namespace]);
+    })();
+  }, [expenseAdjustment, loaded, namespace]);
 
   function seedData() {
     const d = new Date();
@@ -334,9 +379,7 @@ export default function App() {
     setToast(msg);
     clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 2200);
-  }
-
-  function addTransaction(tx) {
+  }function addTransaction(tx) {
     setTransactions((prev) => [{ ...tx, id: uid() }, ...(prev || [])]);
     showToast(tx.type === "income" ? "تم تسجيل الدخل" : "تم تسجيل المصروف");
   }
@@ -392,7 +435,9 @@ export default function App() {
     const income = txIncome + (incomeAdjustment || 0);
     const expense = txExpense + (expenseAdjustment || 0);
     return { income, expense, balance: (openingBalance || 0) + income - expense };
-  }, [transactions, openingBalance, incomeAdjustment, expenseAdjustment]);function setBalance(desired) {
+  }, [transactions, openingBalance, incomeAdjustment, expenseAdjustment]);
+
+  function setBalance(desired) {
     const netFromTotals = totals.income - totals.expense;
     setOpeningBalance(desired - netFromTotals);
     showToast("تم تحديث الرصيد الحالي");
@@ -471,9 +516,7 @@ export default function App() {
       if (search && !(`${t.note} ${t.category}`.toLowerCase().includes(search.toLowerCase()))) return false;
       return true;
     });
-  }, [sorted, filterType, filterCat, search]);
-
-  const withRunning = useMemo(() => {
+  }, [sorted, filterType, filterCat, search]);const withRunning = useMemo(() => {
     const chronological = [...(transactions || [])].sort((a, b) => (a.date > b.date ? 1 : -1));
     const balanceAt = {};
     let running = 0;
@@ -510,7 +553,9 @@ export default function App() {
         </div>
       </div>
     );
-                                                                           }return (
+  }
+
+  return (
     <div style={styles.ledgerRoot}>
       <div style={styles.ledgerToolbar}>
         <span style={styles.ledgerTitle}>{title}</span>
@@ -534,7 +579,7 @@ export default function App() {
         <div style={styles.insightBody}>
           {topCategory && (
             <span style={styles.insightChip}>
-              أعلى إنفاق: <b>{topCategory.name}</b> ({fmt(topCategory.value)} {CURRENCY})
+              أعلى إنفاق: <b>{topCategory.name}</b> ({fmt(topCategory.value)} {currency})
             </span>
           )}
           {momChange !== null && (
@@ -587,7 +632,7 @@ export default function App() {
                     <div style={{ fontSize: 13, color: "#8A968D" }}>{r.category}</div>
                   </div>
                   <span style={{ fontWeight: 700, fontSize: 15, fontVariantNumeric: "tabular-nums", color: "#12312A" }}>
-                    {fmt(r.amount)} {CURRENCY}
+                    {fmt(r.amount)} {currency}
                   </span>
                   <span style={{ ...styles.statusBadge, background: badge.bg, color: badge.fg }}>
                     {r.state === "paid" && <CheckCircle2 size={13} />}
@@ -612,9 +657,7 @@ export default function App() {
             })}
           </div>
         )}
-      </section>
-
-      <section style={styles.chartsGrid}>
+      </section><section style={styles.chartsGrid}>
         <div style={styles.chartCard}>
           <div style={styles.chartTitle}>توزيع المصروفات حسب الفئة</div>
           {categoryBreakdown.length ? (
@@ -628,7 +671,7 @@ export default function App() {
                       ))}
                     </Pie>
                     <ReTooltip
-                      formatter={(v, n) => [`${fmt(v)} ${CURRENCY}`, n]}
+                      formatter={(v, n) => [`${fmt(v)} ${currency}`, n]}
                       contentStyle={{ fontFamily: "Tajawal, sans-serif", direction: "rtl", borderRadius: 8, border: "1px solid #E3E8E2", fontSize: 14 }}
                     />
                   </PieChart>
@@ -658,7 +701,7 @@ export default function App() {
                 <XAxis dataKey="day" tick={{ fontFamily: "Tajawal, sans-serif", fontSize: 12, fill: "#5A6B5F" }} axisLine={{ stroke: "#D8DED6" }} tickLine={false} />
                 <YAxis tick={{ fontFamily: "Tajawal, sans-serif", fontSize: 11, fill: "#5A6B5F" }} axisLine={false} tickLine={false} />
                 <ReTooltip
-                  formatter={(v) => [`${fmt(v)} ${CURRENCY}`, "مصروف"]}
+                  formatter={(v) => [`${fmt(v)} ${currency}`, "مصروف"]}
                   contentStyle={{ fontFamily: "Tajawal, sans-serif", direction: "rtl", borderRadius: 8, border: "1px solid #E3E8E2", fontSize: 14 }}
                   cursor={{ fill: "#F1F4F0" }}
                 />
@@ -669,29 +712,30 @@ export default function App() {
         </div>
       </section>
 
-      <section style={styles.controls}><div style={styles.searchBox}>
+      <section style={styles.controls}>
+        <div style={styles.searchBox}>
           <Search size={17} color="#5A6B5F" />
           <input placeholder="ابحث في القيود…" value={search} onChange={(e) => setSearch(e.target.value)} style={styles.searchInput} />
         </div>
-      <Dropdown
-  value={filterType}
-  onChange={(v) => { setFilterType(v); setFilterCat("all"); }}
-  options={[
-    { value: "all", label: "كل الأنواع" },
-    { value: "income", label: "دخل" },
-    { value: "expense", label: "مصروف" },
-  ]}
-/>
-<Dropdown
-  value={filterCat}
-  onChange={setFilterCat}
-  options={[
-    { value: "all", label: "كل الفئات" },
-    ...(filterType === "income" ? INCOME_CATS : filterType === "expense" ? EXPENSE_CATS : ALL_CATS)
-      .filter((c, i, arr) => arr.findIndex((x) => x.id === c.id) === i)
-      .map((c) => ({ value: c.id, label: c.id })),
-  ]}
-/>
+        <Dropdown
+          value={filterType}
+          onChange={(v) => { setFilterType(v); setFilterCat("all"); }}
+          options={[
+            { value: "all", label: "كل الأنواع" },
+            { value: "income", label: "دخل" },
+            { value: "expense", label: "مصروف" },
+          ]}
+        />
+        <Dropdown
+          value={filterCat}
+          onChange={setFilterCat}
+          options={[
+            { value: "all", label: "كل الفئات" },
+            ...(filterType === "income" ? INCOME_CATS : filterType === "expense" ? EXPENSE_CATS : ALL_CATS)
+              .filter((c, i, arr) => arr.findIndex((x) => x.id === c.id) === i)
+              .map((c) => ({ value: c.id, label: c.id })),
+          ]}
+        />
       </section>
 
       <section style={styles.ledgerCard}>
@@ -742,9 +786,7 @@ export default function App() {
             );
           })
         )}
-      </section>
-
-      {showForm && (
+      </section>{showForm && (
         <TransactionForm
           type={formType}
           setType={setFormType}
@@ -807,7 +849,10 @@ export default function App() {
       {toast && <div style={styles.toast}>{toast}</div>}
     </div>
   );
-            }function SummaryCard({ label, value, icon: Icon, tone, editable, onEdit }) {
+}
+
+function SummaryCard({ label, value, icon: Icon, tone, editable, onEdit }) {
+  const currency = useContext(CurrencyContext);
   const toneStyles = {
     ink: { bg: "#12312A", fg: "#F1F4F0", accent: "#C9A227" },
     income: { bg: "#FFFFFF", fg: "#2F6F4E", accent: "#2F6F4E" },
@@ -831,7 +876,7 @@ export default function App() {
         <Icon size={17} color={toneStyles.accent} />
       </div>
       <div style={{ fontSize: 27, fontWeight: 800, marginTop: 8, fontVariantNumeric: "tabular-nums", color: toneStyles.bg === "#FFFFFF" ? toneStyles.fg : "#F1F4F0" }}>
-        {fmt(value)} <span style={{ fontSize: 14, fontWeight: 500, opacity: 0.7 }}>{CURRENCY}</span>
+        {fmt(value)} <span style={{ fontSize: 14, fontWeight: 500, opacity: 0.7 }}>{currency}</span>
       </div>
       {editable && <span style={{ fontSize: 12, opacity: 0.65, marginTop: 4, display: "block" }}>اضغط للتعديل</span>}
     </div>
@@ -845,6 +890,7 @@ function EmptyMini({ text, tall }) {
     </div>
   );
 }
+
 function Dropdown({ value, onChange, options }) {
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value);
@@ -881,14 +927,13 @@ function Dropdown({ value, onChange, options }) {
 }
 
 function TransactionForm({ type, setType, initial, onClose, onSubmit, onDelete }) {
+  const currency = useContext(CurrencyContext);
   const cats = type === "income" ? INCOME_CATS : EXPENSE_CATS;
   const [amount, setAmount] = useState(initial ? String(initial.amount) : "");
   const [category, setCategory] = useState(initial ? initial.category : cats[0].id);
   const [note, setNote] = useState(initial ? initial.note || "" : "");
   const [date, setDate] = useState(initial ? initial.date : todayISO());
-  const [error, setError] = useState("");
-
-  useEffect(() => {
+  const [error, setError] = useState("");useEffect(() => {
     if (!initial) setCategory((type === "income" ? INCOME_CATS : EXPENSE_CATS)[0].id);
   }, [type]);
 
@@ -912,7 +957,7 @@ function TransactionForm({ type, setType, initial, onClose, onSubmit, onDelete }
           <button onClick={() => setType("income")} style={{ ...styles.typeBtn, background: type === "income" ? "#2F6F4E" : "transparent", color: type === "income" ? "#fff" : "#5A6B5F" }}>دخل</button>
         </div>
 
-        <label style={styles.label}>المبلغ ({CURRENCY})</label>
+        <label style={styles.label}>المبلغ ({currency})</label>
         <input type="number" inputMode="decimal" placeholder="0.00" value={amount} onChange={(e) => { setAmount(e.target.value); setError(""); }} style={styles.input} autoFocus />
 
         <label style={styles.label}>الفئة</label>
@@ -950,6 +995,7 @@ function TransactionForm({ type, setType, initial, onClose, onSubmit, onDelete }
 }
 
 function ReminderForm({ initial, onClose, onSubmit, onDelete }) {
+  const currency = useContext(CurrencyContext);
   const [name, setName] = useState(initial ? initial.name : "");
   const [amount, setAmount] = useState(initial ? String(initial.amount) : "");
   const [category, setCategory] = useState(initial ? initial.category : EXPENSE_CATS[0].id);
@@ -976,7 +1022,7 @@ function ReminderForm({ initial, onClose, onSubmit, onDelete }) {
         <label style={styles.label}>اسم الالتزام</label>
         <input type="text" placeholder="مثال: إيجار الشقة، اشتراك الإنترنت" value={name} onChange={(e) => { setName(e.target.value); setError(""); }} style={styles.input} autoFocus />
 
-        <label style={styles.label}>المبلغ ({CURRENCY})</label>
+        <label style={styles.label}>المبلغ ({currency})</label>
         <input type="number" inputMode="decimal" placeholder="0.00" value={amount} onChange={(e) => { setAmount(e.target.value); setError(""); }} style={styles.input} />
 
         <label style={styles.label}>الفئة</label>
@@ -1008,7 +1054,10 @@ function ReminderForm({ initial, onClose, onSubmit, onDelete }) {
       </div>
     </div>
   );
-                     }function AmountEditForm({ title, hint, current, onClose, onSubmit }) {
+}
+
+function AmountEditForm({ title, hint, current, onClose, onSubmit }) {
+  const currency = useContext(CurrencyContext);
   const [value, setValue] = useState(String(Math.round(current * 100) / 100));
   const [error, setError] = useState("");
 
@@ -1016,9 +1065,7 @@ function ReminderForm({ initial, onClose, onSubmit, onDelete }) {
     const n = parseFloat(value);
     if (value === "" || isNaN(n)) { setError("أدخل رقمًا صحيحًا"); return; }
     onSubmit(n);
-  }
-
-  return (
+  }return (
     <div style={styles.overlay} onClick={onClose}>
       <div style={styles.modal} onClick={(e) => e.stopPropagation()} dir="rtl">
         <div style={styles.modalHead}>
@@ -1026,7 +1073,7 @@ function ReminderForm({ initial, onClose, onSubmit, onDelete }) {
           <button onClick={onClose} style={styles.closeBtn}><X size={19} /></button>
         </div>
         <p style={{ fontSize: 13.5, color: "#5A6B5F", margin: "0 2px 14px", lineHeight: 1.75 }}>{hint}</p>
-        <label style={styles.label}>القيمة ({CURRENCY})</label>
+        <label style={styles.label}>القيمة ({currency})</label>
         <input type="number" inputMode="decimal" step="0.01" value={value} onChange={(e) => { setValue(e.target.value); setError(""); }} style={styles.input} autoFocus />
         {error && <div style={styles.errorText}>{error}</div>}
         <button style={styles.submitBtn} onClick={submit}>حفظ</button>
@@ -1056,6 +1103,29 @@ function NameEditForm({ title, hint, label, placeholder, onClose, onSubmit }) {
         <input type="text" placeholder={placeholder} value={value} onChange={(e) => { setValue(e.target.value); setError(""); }} style={styles.input} autoFocus />
         {error && <div style={styles.errorText}>{error}</div>}
         <button style={styles.submitBtn} onClick={submit}>حفظ</button>
+      </div>
+    </div>
+  );
+}
+
+function SettingsPanel({ currency, onChangeCurrency, onClose }) {
+  return (
+    <div style={styles.overlay} onClick={onClose}>
+      <div style={styles.modal} onClick={(e) => e.stopPropagation()} dir="rtl">
+        <div style={styles.modalHead}>
+          <span style={{ fontWeight: 800, fontSize: 18, color: "#12312A" }}>الإعدادات</span>
+          <button onClick={onClose} style={styles.closeBtn}><X size={19} /></button>
+        </div>
+
+        <label style={styles.label}>العملة</label>
+        <Dropdown value={currency} onChange={onChangeCurrency} options={CURRENCY_OPTIONS} />
+
+        <label style={{ ...styles.label, marginTop: 22 }}>المظهر</label>
+        <div style={styles.comingSoonBox}>
+          الوضع الداكن قيد التجهيز — رح يوصلك بتحديث قريب.
+        </div>
+
+        <button style={styles.submitBtn} onClick={onClose}>تم</button>
       </div>
     </div>
   );
@@ -1106,7 +1176,11 @@ const styles = {
     backgroundImage: "repeating-linear-gradient(90deg, #C9A227 0 10px, transparent 10px 20px)",
     opacity: 0.55,
   },
-  appHeader: { display: "flex", alignItems: "center", padding: "20px 20px 8px" },
+  appHeader: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 20px 8px" },
+  menuBtn: {
+    border: "1px solid #E3E8E2", background: "#fff", borderRadius: 10,
+    padding: 9, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+  },
   brand: { display: "flex", alignItems: "center", gap: 12 },
   brandMark: {
     width: 42, height: 42, borderRadius: 12,
@@ -1125,9 +1199,7 @@ const styles = {
     flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
     border: "none", borderRadius: 9, padding: "10px 6px",
     fontFamily: "Tajawal, sans-serif", fontWeight: 700, fontSize: 14.5, cursor: "pointer",
-  },
-
-  storeChipsRow: { display: "flex", gap: 8, flexWrap: "wrap", padding: "14px 20px 0" },
+  },storeChipsRow: { display: "flex", gap: 8, flexWrap: "wrap", padding: "14px 20px 0" },
   storeChip: {
     border: "1.5px solid #E3E8E2", borderRadius: 20, padding: "8px 16px",
     fontFamily: "Tajawal, sans-serif", fontWeight: 700, fontSize: 14, cursor: "pointer",
@@ -1161,7 +1233,8 @@ const styles = {
   ledgerRoot: { paddingBottom: 40 },
   ledgerToolbar: {
     display: "flex", alignItems: "center", justifyContent: "space-between",
-    padding: "16px 20px 0",},
+    padding: "16px 20px 0",
+  },
   ledgerTitle: { fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 17, color: "#12312A" },
   addBtn: {
     display: "flex", alignItems: "center", gap: 6,
@@ -1288,6 +1361,10 @@ const styles = {
     cursor: "pointer", fontFamily: "Tajawal, sans-serif",
   },
   errorText: { color: "#A6462E", fontSize: 13.5, marginTop: 10 },
+  comingSoonBox: {
+    background: "#F1F4F0", border: "1px dashed #E3E8E2", borderRadius: 10,
+    padding: "12px 14px", fontSize: 13.5, color: "#5A6B5F", lineHeight: 1.7,
+  },
   submitBtn: {
     width: "100%", marginTop: 18, background: "#12312A", color: "#F1F4F0",
     border: "none", borderRadius: 12, padding: "14px 0",
