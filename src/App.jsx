@@ -129,7 +129,9 @@ export default function App() {
           <Menu size={22} color="#12312A" />
         </button>
         <div style={styles.brand}>
-          <div style={styles.brandMark}>د</div>
+          <div style={styles.brandMark}>
+  <img src="logo.png" alt="دفتري" style={styles.brandMarkImg} />
+</div>
           <div>
             <div style={styles.brandTitle}>دفتري</div>
             <div style={styles.brandSub}>محاسبتك اليومية، بلمسة قلم</div>
@@ -547,7 +549,9 @@ export default function App() {
   if (!loaded || transactions === null || reminders === null || openingBalance === null || incomeAdjustment === null || expenseAdjustment === null) {
     return (
       <div style={styles.loadingScreen}>
-        <div style={styles.loadingMark}>د</div>
+        <div style={styles.loadingMark}>
+  <img src="logo.png" alt="دفتري" style={styles.loadingMarkImg} />
+</div>
         <div style={{ fontFamily: "Tajawal, sans-serif", color: "#12312A", fontSize: 15 }}>
           جارِ فتح الدفتر…
         </div>
@@ -1167,10 +1171,11 @@ const styles = {
   },
   loadingMark: {
     width: 48, height: 48, borderRadius: "50%",
-    background: "#12312A", color: "#C9A227",
+    background: "#12312A",
     display: "flex", alignItems: "center", justifyContent: "center",
-    fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 22,
-  },
+    overflow: "hidden",
+},
+loadingMarkImg: { width: "100%", height: "100%", objectFit: "cover" },
   stitchTop: {
     height: 6,
     backgroundImage: "repeating-linear-gradient(90deg, #C9A227 0 10px, transparent 10px 20px)",
@@ -1184,10 +1189,11 @@ const styles = {
   brand: { display: "flex", alignItems: "center", gap: 12 },
   brandMark: {
     width: 42, height: 42, borderRadius: 12,
-    background: "#12312A", color: "#C9A227",
+    background: "#12312A",
     display: "flex", alignItems: "center", justifyContent: "center",
-    fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 19, flexShrink: 0,
-  },
+    overflow: "hidden", flexShrink: 0,
+},
+brandMarkImg: { width: "100%", height: "100%", objectFit: "cover" },
   brandTitle: { fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 21, lineHeight: 1.2 },
   brandSub: { fontSize: 13.5, color: "#5A6B5F", marginTop: 1 },
 
