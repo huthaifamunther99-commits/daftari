@@ -1,4 +1,4 @@
-import { backupData, restoreData } from "./firebase";
+import React, { useState, useEffect, useMemo, useRef, useContext } from "react";
 import { backupData, restoreData } from "./firebase";
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as ReTooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
