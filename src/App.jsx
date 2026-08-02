@@ -7,7 +7,7 @@ import {
   Plus, TrendingUp, TrendingDown, Wallet, Trash2, Search,
   X, Coins, Utensils, Car, Home, Zap, ShoppingBag, HeartPulse,
   Film, Briefcase, PiggyBank, MoreHorizontal, Sparkles,
-  Bell, CheckCircle2, AlertTriangle, Store, User, ChevronLeft,
+  Bell, CheckCircle2, AlertTriangle, Store, User, ChevronLeft, ChevronDown,
 } from "lucide-react";
 
 const INCOME_CATS = [
@@ -673,19 +673,25 @@ export default function App() {
           <Search size={17} color="#5A6B5F" />
           <input placeholder="ابحث في القيود…" value={search} onChange={(e) => setSearch(e.target.value)} style={styles.searchInput} />
         </div>
-        <select value={filterType} onChange={(e) => { setFilterType(e.target.value); setFilterCat("all"); }} style={styles.select}>
-          <option value="all">كل الأنواع</option>
-          <option value="income">دخل</option>
-          <option value="expense">مصروف</option>
-        </select>
-        <select value={filterCat} onChange={(e) => setFilterCat(e.target.value)} style={styles.select}>
-          <option value="all">كل الفئات</option>
-          {(filterType === "income" ? INCOME_CATS : filterType === "expense" ? EXPENSE_CATS : ALL_CATS)
-            .filter((c, i, arr) => arr.findIndex((x) => x.id === c.id) === i)
-            .map((c) => (
-              <option key={c.id} value={c.id}>{c.id}</option>
-            ))}
-        </select>
+      <Dropdown
+  value={filterType}
+  onChange={(v) => { setFilterType(v); setFilterCat("all"); }}
+  options={[
+    { value: "all", label: "كل الأنواع" },
+    { value: "income", label: "دخل" },
+    { value: "expense", label: "مصروف" },
+  ]}
+/>
+<Dropdown
+  value={filterCat}
+  onChange={setFilterCat}
+  options={[
+    { value: "all", label: "كل الفئات" },
+    ...(filterType === "income" ? INCOME_CATS : filterType === "expense" ? EXPENSE_CATS : ALL_CATS)
+      .filter((c, i, arr) => arr.findIndex((x) => x.id === c.id) === i)
+      .map((c) => ({ value: c.id, label: c.id })),
+  ]}
+/>
       </section>
 
       <section style={styles.ledgerCard}>
@@ -836,6 +842,40 @@ function EmptyMini({ text, tall }) {
   return (
     <div style={{ padding: tall ? "36px 12px" : "20px 12px", textAlign: "center", color: "#8A968D", fontSize: 14.5 }}>
       {text}
+    </div>
+  );
+}
+function Dropdown({ value, onChange, options }) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find((o) => o.value === value);
+  return (
+    <div style={{ position: "relative" }}>
+      <button type="button" onClick={() => setOpen((o) => !o)} style={styles.dropdownBtn}>
+        <span>{selected ? selected.label : ""}</span>
+        <ChevronDown size={16} color="#5A6B5F" />
+      </button>
+      {open && (
+        <>
+          <div style={styles.dropdownBackdrop} onClick={() => setOpen(false)} />
+          <div style={styles.dropdownMenu}>
+            {options.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => { onChange(o.value); setOpen(false); }}
+                style={{
+                  ...styles.dropdownItem,
+                  fontWeight: o.value === value ? 700 : 500,
+                  color: o.value === value ? "#12312A" : "#3F4F44",
+                  background: o.value === value ? "#F1F4F0" : "transparent",
+                }}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -1183,6 +1223,24 @@ const styles = {
   },
   searchInput: { border: "none", outline: "none", flex: 1, fontFamily: "Tajawal, sans-serif", fontSize: 15, background: "transparent", color: "#12312A" },
   select: { border: "1px solid #E3E8E2", borderRadius: 10, padding: "10px 10px", fontFamily: "Tajawal, sans-serif", fontSize: 14.5, background: "#fff", color: "#3F4F44" },
+  dropdownBtn: {
+    display: "flex", alignItems: "center", gap: 8,
+    border: "1px solid #E3E8E2", borderRadius: 10, padding: "10px 12px",
+    fontFamily: "Tajawal, sans-serif", fontSize: 14.5, background: "#fff", color: "#3F4F44",
+    cursor: "pointer", whiteSpace: "nowrap",
+  },
+  dropdownBackdrop: { position: "fixed", inset: 0, zIndex: 70 },
+  dropdownMenu: {
+    position: "absolute", top: "calc(100% + 6px)", right: 0, minWidth: 160,
+    maxHeight: 260, overflowY: "auto",
+    background: "#fff", border: "1px solid #E3E8E2", borderRadius: 12,
+    boxShadow: "0 10px 30px rgba(18,49,42,0.18)", zIndex: 80, padding: 6,
+  },
+  dropdownItem: {
+    display: "block", width: "100%", textAlign: "right",
+    border: "none", borderRadius: 8, padding: "10px 12px",
+    fontFamily: "Tajawal, sans-serif", fontSize: 14.5, cursor: "pointer",
+  },
   ledgerCard: {
     margin: "16px 20px 0", background: "#fff", border: "1px solid #E3E8E2",
     borderRight: "3px solid #A6462E", borderRadius: 14, overflow: "hidden", padding: "6px 14px 6px",
