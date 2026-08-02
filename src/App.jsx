@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef, useContext } from "react";
-import {
+import { backupData, restoreData } from "./firebase";
+import { backupData, restoreData } from "./firebase";
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as ReTooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from "recharts";
@@ -118,7 +118,40 @@ export default function App() {
     }
   }
 
-  const activeStore = (stores || []).find((s) => s.id === activeStoreId);
+ const activeStore = (stores || []).find((s) => s.id === activeStoreId);
+
+  const ALL_KEYS = ["currency", "stores", "transactions", "reminders", "openingBalance", "incomeAdjustment", "expenseAdjustment"];
+
+  async function doBackup() {
+    const bundle = {};
+    for (const s of stores || []) {
+      for (const k of ["transactions", "reminders", "openingBalance", "incomeAdjustment", "expenseAdjustment"]) {
+        try {
+          const r = await window.storage.get(nsKey(s.id, k));
+          if (r && r.value) bundle[nsKey(s.id, k)] = r.value;
+        } catch (e) {}
+      }
+    }
+    for (const k of ALL_KEYS) {
+      try {
+        const r = await window.storage.get(k);
+        if (r && r.value) bundle[k] = r.value;
+      } catch (e) {}
+    }
+    await backupData(bundle);
+  }
+
+  async function doRestore() {
+    const bundle = await restoreData();
+    if (!bundle) return false;
+    for (const key in bundle) {
+      try {
+        await window.storage.set(key, bundle[key]);
+      } catch (e) {}
+    }
+    window.location.reload();
+    return true;
+    }
 
   return (
     <CurrencyContext.Provider value={currency}>
