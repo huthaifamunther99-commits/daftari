@@ -19,6 +19,8 @@ workflows:
         script: npm run build
       - name: إضافة منصة Android (أول مرة فقط)
         script: npx cap add android || true
+      - name: توليد أيقونة التطبيق من resources/icon.png
+        script: npx capacitor-assets generate --android || true
       - name: مزامنة Capacitor
         script: npx cap sync android
       - name: بناء APK
