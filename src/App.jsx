@@ -62,6 +62,7 @@ export default function App() {
   const [showAddStore, setShowAddStore] = useState(false);
   const [currency, setCurrency] = useState(DEFAULT_CURRENCY);
   const [showSettings, setShowSettings] = useState(false);
+  const [theme, setTheme] = useState("light");
 
   useEffect(() => {
     (async () => {
@@ -156,7 +157,7 @@ export default function App() {
 
   return (
     <CurrencyContext.Provider value={currency}>
-    <div dir="rtl" lang="ar" style={styles.appShell}>
+    <div dir="rtl" lang="ar" data-theme={theme} style={styles.appShell}>
       <FontLoader />
       <div style={styles.stitchTop} /><header style={styles.appHeader}>
         <button style={styles.menuBtn} onClick={() => setShowSettings(true)} aria-label="الإعدادات">
@@ -274,6 +275,8 @@ export default function App() {
         <SettingsPanel
           currency={currency}
           onChangeCurrency={setCurrency}
+          theme={theme}
+          onChangeTheme={setTheme}
           onClose={() => setShowSettings(false)}
         />
       )}
@@ -1432,7 +1435,7 @@ function NameEditForm({ title, hint, label, placeholder, onClose, onSubmit }) {
   );
 }
 
-function SettingsPanel({ currency, onChangeCurrency, onClose }) {
+function SettingsPanel({ currency, onChangeCurrency, theme, onChangeTheme, onClose }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -1480,8 +1483,9 @@ function SettingsPanel({ currency, onChangeCurrency, onClose }) {
         </button>
         {msg && <div style={{ fontSize: 13.5, color: "#5A6B5F", marginTop: 8, textAlign: "center" }}>{msg}</div>}
         <label style={{ ...styles.label, marginTop: 22 }}>المظهر</label>
-        <div style={styles.comingSoonBox}>
-          الوضع الداكن قيد التجهيز — رح يوصلك بتحديث قريب.
+        <div style={styles.typeToggle}>
+          <button onClick={() => onChangeTheme("light")} style={{ ...styles.typeBtn, background: theme === "light" ? "#12312A" : "transparent", color: theme === "light" ? "#fff" : "#5A6B5F" }}>فاتح</button>
+          <button onClick={() => onChangeTheme("dark")} style={{ ...styles.typeBtn, background: theme === "dark" ? "#12312A" : "transparent", color: theme === "dark" ? "#fff" : "#5A6B5F" }}>داكن</button>
         </div>
 
         <button style={styles.submitBtn} onClick={onClose}>تم</button>
@@ -1495,7 +1499,9 @@ function FontLoader() {
     <style>{`
       @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700&display=swap');
       * { box-sizing: border-box; }
-      html, body { overscroll-behavior-x: none; }
+      html, body { overscroll-behavior-x: none;
+      [data-theme="light"] { --bg: #F1F4F0; --card: #FFFFFF; --text: #12312A; --text-2: #5A6B5F; --border: #E3E8E2; --input-bg: #FFFFFF; --modal-bg: #F7F9F6; }
+      [data-theme="dark"] { --bg: #0F1712; --card: #182620; --text: #E9EFE9; --text-2: #93A399; --border: #2A3830; --input-bg: #182620; --modal-bg: #142019; }}
       input:focus, select:focus, button:focus-visible {
         outline: 2px solid #C9A227;
         outline-offset: 1px;
@@ -1511,9 +1517,9 @@ function FontLoader() {
 const styles = {
   appShell: {
     fontFamily: "Tajawal, sans-serif",
-    background: "#F1F4F0",
+    background: "var(--bg)",
     minHeight: "100vh",
-    color: "#12312A",
+    color: "var(--text)",
     maxWidth: 760,
     margin: "0 auto",
     position: "relative",
