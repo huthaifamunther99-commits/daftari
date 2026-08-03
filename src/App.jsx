@@ -1499,7 +1499,7 @@ function FontLoader() {
     <style>{`
       @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700&display=swap');
       * { box-sizing: border-box; }
-      html, body { overscroll-behavior-x: none;
+      html, body { overscroll-behavior-x: none; background: var(--bg); }
       [data-theme="light"] { --bg: #F1F4F0; --card: #FFFFFF; --text: #12312A; --text-2: #5A6B5F; --border: #E3E8E2; --input-bg: #FFFFFF; --modal-bg: #F7F9F6; }
       [data-theme="dark"] { --bg: #0F1712; --card: #182620; --text: #E9EFE9; --text-2: #93A399; --border: #2A3830; --input-bg: #182620; --modal-bg: #142019; }}
       input:focus, select:focus, button:focus-visible {
