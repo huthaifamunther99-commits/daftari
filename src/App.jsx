@@ -8,7 +8,7 @@ import {
   Plus, TrendingUp, TrendingDown, Wallet, Trash2, Search,
   X, Coins, Utensils, Car, Home, Zap, ShoppingBag, HeartPulse,
   Film, Briefcase, PiggyBank, MoreHorizontal, Sparkles,
-  Bell, CheckCircle2, AlertTriangle, Store, User, ChevronLeft, ChevronDown, Menu,
+  Bell, CheckCircle2, AlertTriangle, Store, User, ChevronLeft, ChevronDown, Menu, Package,
 } from "lucide-react";
 
 const INCOME_CATS = [
@@ -634,6 +634,10 @@ export default function App() {
         </div>
       </section>
 
+      {namespace && (
+        <ItemsPanel namespace={namespace} currency={currency} onRecordSale={addTransaction} />
+      )}
+
       <section style={styles.remindersCard}>
         <div style={styles.remindersHead}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -884,11 +888,509 @@ export default function App() {
         />
       )}
 
-      {toast && <div style={styles.toast}>{toast}</div>}
+      
+{toast && <div style={styles.toast}>{toast}</div>}
     </div>
   );
 }
 
+function ItemsPanel({ namespace, currency, onRecordSale }) {
+  const [items, setItems] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+  const [showItemForm, setShowItemForm] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [showSaleForm, setShowSaleForm] = useState(false);
+  const [saleItem, setSaleItem] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await window.storage.get(nsKey(namespace, "items"));
+        setItems(res && res.value ? JSON.parse(res.value) : []);
+      } catch (e) {
+        setItems([]);
+      } finally {
+        setLoaded(true);
+      }
+    })();
+  }, [namespace]);
+
+  useEffect(() => {
+    if (!loaded || items === null) return;
+    (async () => {
+      try {
+        await window.storage.set(nsKey(namespace, "items"), JSON.stringify(items));
+      } catch (e) {}
+    })();
+  }, [items, loaded, namespace]);
+
+  function addItem(item) {
+    setItems((prev) => [
+      { ...item, id: uid(), remainingQty: item.originalQty },
+      ...(prev || []),
+    ]);
+  }
+
+  function updateItem(id, item) {
+    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...item } : it)));
+  }
+
+  function deleteItem(id) {
+    setItems((prev) => prev.filter((it) => it.id !== id));
+  }
+
+  function recordSale(item, qty) {
+    const n = Number(qty);
+    setItems((prev) =>
+      prev.map((it) =>
+        it.id === item.id ? { ...it, remainingQty: Math.max(0, it.remainingQty - n) } : it
+      )
+    );
+    onRecordSale({
+      type: "income",
+      amount: item.price * n,
+      category: "مبيعات",
+      note: `بيع: ${item.name} (${n})`,
+      date: todayISO(),
+    });
+  }
+
+  if (!loaded || items === null) return null;
+return (
+    <section style={styles.itemsCard}>
+      <div style={styles.itemsHead}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Package size={19} color="#12312A" />
+          <span style={styles.itemsTitle}>الأصناف والمخزون</span>
+        </div>
+        <button style={styles.smallAddBtn} onClick={() => { setEditingItem(null); setShowItemForm(true); }}>
+          <Plus size={16} strokeWidth={2.5} />
+          صنف جديد
+        </button>
+      </div>
+
+      {items.length === 0 ? (
+        <EmptyMini text="لا توجد أصناف مسجّلة بعد. أضف أول صنف لتتبع مبيعاتك ومخزونك." />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 12 }}>
+          {items.map((it) => {
+            const lowStock = it.remainingQty <= 5;
+            const hasCost = it.cost !== undefined && it.cost !== null && it.cost !== "";
+            const profitPerUnit = hasCost ? it.price - Number(it.cost) : null;
+            const marginPct = hasCost && it.price > 0 ? Math.round((profitPerUnit / it.price) * 100) : null;
+            return (
+              <div key={it.id} style={styles.itemCard}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={styles.itemName}>{it.name}</div>
+                    <div style={styles.itemPriceRow}>
+                      {fmt(it.price)} {currency} / قطعة
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => { setEditingItem(it); setShowItemForm(true); }}
+                    style={styles.deleteBtn}
+                    aria-label="تعديل الصنف"
+                  >
+                    <Menu size={16} />
+                  </button>
+                </div>
+
+                <div style={styles.itemStatsRow}>
+                  <div style={styles.itemStatBox}>
+                    <div style={styles.itemStatLabel}>الكمية الأصلية</div>
+                    <div style={styles.itemStatValue}>{it.originalQty}</div>
+                  </div>
+                  <div style={styles.itemStatBox}>
+                    <div style={styles.itemStatLabel}>المباع</div>
+                    <div style={styles.itemStatValue}>{it.originalQty - it.remainingQty}</div>
+                  </div>
+                  <div style={{ ...styles.itemStatBox, background: lowStock ? "#A6462E14" : "#EDF1EA" }}>
+                    <div style={styles.itemStatLabel}>المتبقي</div>
+                    <div style={{ ...styles.itemStatValue, color: lowStock ? "#A6462E" : "#12312A" }}>
+                      {it.remainingQty}
+                    </div>
+                  </div>
+                </div>
+
+                {lowStock && (
+                  <div style={styles.lowStockBadge}>
+                    <AlertTriangle size={15} />
+                    الكمية قاربت على النفاد
+                  </div>
+                )}
+
+                {hasCost && (
+                  <div style={styles.profitBox}>
+                    <span>هامش الربح للقطعة: <b>{fmt(profitPerUnit)} {currency}</b></span>
+                    <span style={styles.profitPct}>{marginPct}٪</span>
+                  </div>
+                )}
+
+                <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                  <button
+                    style={styles.sellBtn}
+                    disabled={it.remainingQty <= 0}
+                    onClick={() => { setSaleItem(it); setShowSaleForm(true); }}
+                  >
+                    تسجيل عملية بيع
+                  </button>
+                  <button
+                    onClick={() => deleteItem(it.id)}
+                    style={styles.deleteBtn}
+                    aria-label="حذف الصنف"
+                  >
+                    <Trash2 size={17} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {showItemForm && (
+        <ItemForm
+          initial={editingItem}
+          currency={currency}
+          onClose={() => { setShowItemForm(false); setEditingItem(null); }}
+          onDelete={editingItem ? () => { deleteItem(editingItem.id); setShowItemForm(false); setEditingItem(null); } : null}
+          onSubmit={(item) => {
+            if (editingItem) updateItem(editingItem.id, item);
+            else addItem(item);
+            setShowItemForm(false);
+            setEditingItem(null);
+          }}
+        />
+      )}
+
+      {showSaleForm && saleItem && (
+        <SaleForm
+          item={saleItem}
+          currency={currency}
+          onClose={() => { setShowSaleForm(false); setSaleItem(null); }}
+          onSubmit={(qty) => {
+            recordSale(saleItem, qty);
+            setShowSaleForm(false);
+            setSaleItem(null);
+          }}
+        />
+      )}
+    </section>
+  );
+}
+function ItemForm({ initial, currency, onClose, onSubmit, onDelete }) {
+  const [name, setName] = useState(initial ? initial.name : "");
+  const [price, setPrice] = useState(initial ? String(initial.price) : "");
+  const [cost, setCost] = useState(initial && initial.cost !== undefined ? String(initial.cost) : "");
+  const [originalQty, setOriginalQty] = useState(initial ? String(initial.originalQty) : "");
+  const [error, setError] = useState("");
+
+  function submit() {
+    if (!name.trim()) { setError("اكتب اسم الصنف"); return; }
+    const p = parseFloat(price);
+    if (!price || isNaN(p) || p <= 0) { setError("أدخل سعر بيع صحيح أكبر من صفر"); return; }
+    const q = parseInt(originalQty, 10);
+    if (!originalQty || isNaN(q) || q < 0) { setError("أدخل كمية صحيحة"); return; }
+    const c = cost === "" ? undefined : parseFloat(cost);
+    if (cost !== "" && (isNaN(c) || c < 0)) { setError("سعر التكلفة غير صحيح"); return; }
+    onSubmit({
+      name: name.trim(),
+      price: p,
+      cost: c,
+      originalQty: q,
+    });
+  }
+
+  return (
+    <div style={styles.overlay} onClick={onClose}>
+      <div style={styles.modal} onClick={(e) => e.stopPropagation()} dir="rtl">
+        <div style={styles.modalHead}>
+          <span style={{ fontWeight: 800, fontSize: 19, color: "#12312A" }}>{initial ? "تعديل الصنف" : "صنف جديد"}</span>
+          <button onClick={onClose} style={styles.closeBtn}><X size={19} /></button>
+        </div>
+
+        <label style={styles.bigLabel}>اسم الصنف</label>
+        <input type="text" placeholder="مثال: قميص قطن أزرق" value={name} onChange={(e) => { setName(e.target.value); setError(""); }} style={styles.bigInput} autoFocus />
+
+        <label style={styles.bigLabel}>سعر البيع ({currency})</label>
+        <input type="number" inputMode="decimal" placeholder="0.00" value={price} onChange={(e) => { setPrice(e.target.value); setError(""); }} style={styles.bigInput} />
+
+        <label style={styles.bigLabel}>سعر التكلفة ({currency}) — اختياري، لحساب هامش الربح</label>
+        <input type="number" inputMode="decimal" placeholder="0.00" value={cost} onChange={(e) => { setCost(e.target.value); setError(""); }} style={styles.bigInput} />
+
+        <label style={styles.bigLabel}>الكمية الأصلية</label>
+        <input type="number" inputMode="numeric" placeholder="0" value={originalQty} onChange={(e) => { setOriginalQty(e.target.value); setError(""); }} style={styles.bigInput} disabled={!!initial} />
+        {initial && <div style={{ fontSize: 13, color: "#8A968D", marginTop: -8, marginBottom: 8 }}>لا يمكن تعديل الكمية الأصلية بعد إنشاء الصنف</div>}
+
+        {error && <div style={styles.errorText}>{error}</div>}
+
+        <button style={styles.submitBtn} onClick={submit}>{initial ? "حفظ التعديلات" : "إضافة الصنف"}</button>
+        {onDelete && (
+          <button style={styles.deleteFullBtn} onClick={onDelete}>
+            <Trash2 size={15} />
+            حذف هذا الصنف
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SaleForm({ item, currency, onClose, onSubmit }) {
+  const [qty, setQty] = useState("1");
+  const [error, setError] = useState("");
+
+  function submit() {
+    const n = parseInt(qty, 10);
+    if (!qty || isNaN(n) || n <= 0) { setError("أدخل كمية صحيحة أكبر من صفر"); return; }
+    if (n > item.remainingQty) { setError(`الكمية المتوفرة فقط ${item.remainingQty}`); return; }
+    onSubmit(n);
+  }
+
+  const total = item.price * (parseInt(qty, 10) || 0);
+
+  return (
+    <div style={styles.overlay} onClick={onClose}>
+      <div style={styles.modal} onClick={(e) => e.stopPropagation()} dir="rtl">
+        <div style={styles.modalHead}>
+          <span style={{ fontWeight: 800, fontSize: 19, color: "#12312A" }}>تسجيل عملية بيع</span>
+          <button onClick={onClose} style={styles.closeBtn}><X size={19} /></button>
+        </div>
+
+        <div style={{ fontSize: 17, fontWeight: 700, color: "#12312A", marginBottom: 4 }}>{item.name}</div>
+        <div style={{ fontSize: 14.5, color: "#5A6B5F", marginBottom: 14 }}>المتوفر حالياً: {item.remainingQty} قطعة</div>
+
+        <label style={styles.bigLabel}>الكمية المباعة</label>
+        <input type="number" inputMode="numeric" value={qty} onChange={(e) => { setQty(e.target.value); setError(""); }} style={styles.bigInput} autoFocus />
+
+        <div style={styles.saleTotalBox}>
+          الإجمالي: <b>{fmt(total)} {currency}</b>
+        </div>
+
+        {error && <div style={styles.errorText}>{error}</div>}
+
+        <button style={styles.submitBtn} onClick={submit}>تأكيد عملية البيع</button>
+      </div>
+    </div>
+  );
+                                 }
+  return (
+    <section style={styles.itemsCard}>
+      <div style={styles.itemsHead}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Package size={19} color="#12312A" />
+          <span style={styles.itemsTitle}>الأصناف والمخزون</span>
+        </div>
+        <button style={styles.smallAddBtn} onClick={() => { setEditingItem(null); setShowItemForm(true); }}>
+          <Plus size={16} strokeWidth={2.5} />
+          صنف جديد
+        </button>
+      </div>
+
+      {items.length === 0 ? (
+        <EmptyMini text="لا توجد أصناف مسجّلة بعد. أضف أول صنف لتتبع مبيعاتك ومخزونك." />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 12 }}>
+          {items.map((it) => {
+            const lowStock = it.remainingQty <= 5;
+            const hasCost = it.cost !== undefined && it.cost !== null && it.cost !== "";
+            const profitPerUnit = hasCost ? it.price - Number(it.cost) : null;
+            const marginPct = hasCost && it.price > 0 ? Math.round((profitPerUnit / it.price) * 100) : null;
+            return (
+              <div key={it.id} style={styles.itemCard}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={styles.itemName}>{it.name}</div>
+                    <div style={styles.itemPriceRow}>
+                      {fmt(it.price)} {currency} / قطعة
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => { setEditingItem(it); setShowItemForm(true); }}
+                    style={styles.deleteBtn}
+                    aria-label="تعديل الصنف"
+                  >
+                    <Menu size={16} />
+                  </button>
+                </div>
+
+                <div style={styles.itemStatsRow}>
+                  <div style={styles.itemStatBox}>
+                    <div style={styles.itemStatLabel}>الكمية الأصلية</div>
+                    <div style={styles.itemStatValue}>{it.originalQty}</div>
+                  </div>
+                  <div style={styles.itemStatBox}>
+                    <div style={styles.itemStatLabel}>المباع</div>
+                    <div style={styles.itemStatValue}>{it.originalQty - it.remainingQty}</div>
+                  </div>
+                  <div style={{ ...styles.itemStatBox, background: lowStock ? "#A6462E14" : "#EDF1EA" }}>
+                    <div style={styles.itemStatLabel}>المتبقي</div>
+                    <div style={{ ...styles.itemStatValue, color: lowStock ? "#A6462E" : "#12312A" }}>
+                      {it.remainingQty}
+                    </div>
+                    {lowStock && (
+                  <div style={styles.lowStockBadge}>
+                    <AlertTriangle size={15} />
+                    الكمية قاربت على النفاد
+                  </div>
+                )}
+
+                {hasCost && (
+                  <div style={styles.profitBox}>
+                    <span>هامش الربح للقطعة: <b>{fmt(profitPerUnit)} {currency}</b></span>
+                    <span style={styles.profitPct}>{marginPct}٪</span>
+                  </div>
+                )}
+
+                <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                  <button
+                    style={styles.sellBtn}
+                    disabled={it.remainingQty <= 0}
+                    onClick={() => { setSaleItem(it); setShowSaleForm(true); }}
+                  >
+                    تسجيل عملية بيع
+                  </button>
+                  <button
+                    onClick={() => deleteItem(it.id)}
+                    style={styles.deleteBtn}
+                    aria-label="حذف الصنف"
+                  >
+                    <Trash2 size={17} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {showItemForm && (
+        <ItemForm
+          initial={editingItem}
+          currency={currency}
+          onClose={() => { setShowItemForm(false); setEditingItem(null); }}
+          onDelete={editingItem ? () => { deleteItem(editingItem.id); setShowItemForm(false); setEditingItem(null); } : null}
+          onSubmit={(item) => {
+            if (editingItem) updateItem(editingItem.id, item);
+            else addItem(item);
+            setShowItemForm(false);
+            setEditingItem(null);
+          }}
+        />
+      )}
+
+      {showSaleForm && saleItem && (
+        <SaleForm
+          item={saleItem}
+          currency={currency}
+          onClose={() => { setShowSaleForm(false); setSaleItem(null); }}
+          onSubmit={(qty) => {
+            recordSale(saleItem, qty);
+            setShowSaleForm(false);
+            setSaleItem(null);
+          }}
+        />
+      )}
+    </section>
+  );
+}
+
+function ItemForm({ initial, currency, onClose, onSubmit, onDelete }) {
+  const [name, setName] = useState(initial ? initial.name : "");
+  const [price, setPrice] = useState(initial ? String(initial.price) : "");
+  const [cost, setCost] = useState(initial && initial.cost !== undefined ? String(initial.cost) : "");
+  const [originalQty, setOriginalQty] = useState(initial ? String(initial.originalQty) : "");
+  const [error, setError] = useState("");
+
+  function submit() {
+    if (!name.trim()) { setError("اكتب اسم الصنف"); return; }
+    const p = parseFloat(price);
+    if (!price || isNaN(p) || p <= 0) { setError("أدخل سعر بيع صحيح أكبر من صفر"); return; }
+    const q = parseInt(originalQty, 10);
+    if (!originalQty || isNaN(q) || q < 0) { setError("أدخل كمية صحيحة"); return; }
+    const c = cost === "" ? undefined : parseFloat(cost);
+    if (cost !== "" && (isNaN(c) || c < 0)) { setError("سعر التكلفة غير صحيح"); return; }
+    onSubmit({
+      name: name.trim(),
+      price: p,
+      cost: c,
+      originalQty: q,
+    });
+  }
+
+  return (
+    <div style={styles.overlay} onClick={onClose}>
+      <div style={styles.modal} onClick={(e) => e.stopPropagation()} dir="rtl">
+        <div style={styles.modalHead}>
+          <span style={{ fontWeight: 800, fontSize: 19, color: "#12312A" }}>{initial ? "تعديل الصنف" : "صنف جديد"}</span>
+          <button onClick={onClose} style={styles.closeBtn}><X size={19} /></button>
+        </div>
+
+        <label style={styles.bigLabel}>اسم الصنف</label>
+        <input type="text" placeholder="مثال: قميص قطن أزرق" value={name} onChange={(e) => { setName(e.target.value); setError(""); }} style={styles.bigInput} autoFocus />
+
+        <label style={styles.bigLabel}>سعر البيع ({currency})</label>
+        <input type="number" inputMode="decimal" placeholder="0.00" value={price} onChange={(e) => { setPrice(e.target.value); setError(""); }} style={styles.bigInput} />
+
+        <label style={styles.bigLabel}>سعر التكلفة ({currency}) — اختياري، لحساب هامش الربح</label>
+        <input type="number" inputMode="decimal" placeholder="0.00" value={cost} onChange={(e) => { setCost(e.target.value); setError(""); }} style={styles.bigInput} />
+
+        <label style={styles.bigLabel}>الكمية الأصلية</label>
+        <input type="number" inputMode="numeric" placeholder="0" value={originalQty} onChange={(e) => { setOriginalQty(e.target.value); setError(""); }} style={styles.bigInput} disabled={!!initial} />
+        {initial && <div style={{ fontSize: 13, color: "#8A968D", marginTop: -8, marginBottom: 8 }}>لا يمكن تعديل الكمية الأصلية بعد إنشاء الصنف</div>}
+
+        {error && <div style={styles.errorText}>{error}</div>}
+
+        <button style={styles.submitBtn} onClick={submit}>{initial ? "حفظ التعديلات" : "إضافة الصنف"}</button>
+        {onDelete && (
+          <button style={styles.deleteFullBtn} onClick={onDelete}>
+            <Trash2 size={15} />
+            حذف هذا الصنف
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SaleForm({ item, currency, onClose, onSubmit }) {
+  const [qty, setQty] = useState("1");
+  const [error, setError] = useState("");
+
+  function submit() {
+    const n = parseInt(qty, 10);
+    if (!qty || isNaN(n) || n <= 0) { setError("أدخل كمية صحيحة أكبر من صفر"); return; }
+    if (n > item.remainingQty) { setError(`الكمية المتوفرة فقط ${item.remainingQty}`); return; }
+    onSubmit(n);
+  }
+
+  const total = item.price * (parseInt(qty, 10) || 0);
+
+  return (
+    <div style={styles.overlay} onClick={onClose}>
+      <div style={styles.modal} onClick={(e) => e.stopPropagation()} dir="rtl">
+        <div style={styles.modalHead}>
+          <span style={{ fontWeight: 800, fontSize: 19, color: "#12312A" }}>تسجيل عملية بيع</span>
+          <button onClick={onClose} style={styles.closeBtn}><X size={19} /></button>
+        </div>
+
+        <div style={{ fontSize: 17, fontWeight: 700, color: "#12312A", marginBottom: 4 }}>{item.name}</div>
+        <div style={{ fontSize: 14.5, color: "#5A6B5F", marginBottom: 14 }}>المتوفر حالياً: {item.remainingQty} قطعة</div>
+
+        <label style={styles.bigLabel}>الكمية المباعة</label>
+        <input type="number" inputMode="numeric" value={qty} onChange={(e) => { setQty(e.target.value); setError(""); }} style={styles.bigInput} autoFocus />
+
+        <div style={styles.saleTotalBox}>
+          الإجمالي: <b>{fmt(total)} {currency}</b>
+        </div>
+
+        {error && <div style={styles.errorText}>{error}</div>}
+
+        <button style={styles.submitBtn} onClick={submit}>تأكيد عملية البيع</button>
+      </div>
+    </div>
+  );
+      }
 function SummaryCard({ label, value, icon: Icon, tone, editable, onEdit }) {
   const currency = useContext(CurrencyContext);
   const toneStyles = {
@@ -1450,5 +1952,46 @@ brandMarkImg: { width: "100%", height: "100%", objectFit: "cover" },
     background: "#12312A", color: "#F1F4F0", padding: "11px 22px",
     borderRadius: 30, fontSize: 14.5, fontFamily: "Tajawal, sans-serif",
     boxShadow: "0 6px 20px rgba(0,0,0,0.2)", zIndex: 60,
+  },
+      itemsCard: {
+    margin: "16px 20px 0", background: "#fff", border: "1px solid #E3E8E2",
+    borderRight: "3px solid #2F6F4E", borderRadius: 14, padding: "16px",
+  },
+  itemsHead: { display: "flex", alignItems: "center", justifyContent: "space-between" },
+  itemsTitle: { fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 17, color: "#12312A" },
+  itemCard: {
+    background: "#F7F9F6", border: "1px solid #E3E8E2", borderRadius: 12, padding: "14px",
+  },
+  itemName: { fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 18, color: "#12312A" },
+  itemPriceRow: { fontSize: 15, color: "#5A6B5F", marginTop: 4, fontWeight: 600 },
+  itemStatsRow: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: 12 },
+  itemStatBox: { background: "#EDF1EA", borderRadius: 10, padding: "10px 6px", textAlign: "center" },
+  itemStatLabel: { fontSize: 13, color: "#5A6B5F", fontWeight: 600 },
+  itemStatValue: { fontSize: 20, fontWeight: 800, color: "#12312A", marginTop: 4, fontVariantNumeric: "tabular-nums" },
+  lowStockBadge: {
+    display: "flex", alignItems: "center", gap: 6, marginTop: 10,
+    background: "#A6462E14", color: "#A6462E", fontWeight: 700, fontSize: 14,
+    borderRadius: 8, padding: "8px 12px",
+  },
+  profitBox: {
+    display: "flex", justifyContent: "space-between", alignItems: "center",
+    marginTop: 10, background: "#2F6F4E14", borderRadius: 8, padding: "10px 12px",
+    fontSize: 15, color: "#12312A", fontWeight: 600,
+  },
+  profitPct: { fontWeight: 800, fontSize: 16, color: "#2F6F4E" },
+  sellBtn: {
+    flex: 1, background: "#12312A", color: "#F1F4F0", border: "none",
+    borderRadius: 10, padding: "12px 0", fontFamily: "Cairo, sans-serif",
+    fontWeight: 700, fontSize: 16, cursor: "pointer",
+  },
+  bigLabel: { display: "block", fontSize: 15, color: "#3F4F44", margin: "14px 2px 7px", fontWeight: 700 },
+  bigInput: {
+    width: "100%", border: "1.5px solid #E3E8E2", borderRadius: 10,
+    padding: "13px 12px", fontFamily: "Tajawal, sans-serif", fontSize: 17,
+    background: "#fff", color: "#12312A",
+  },
+  saleTotalBox: {
+    marginTop: 16, background: "#EDF1EA", borderRadius: 10, padding: "14px",
+    fontSize: 18, color: "#12312A", textAlign: "center",
   },
 };
