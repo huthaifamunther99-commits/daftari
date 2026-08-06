@@ -1,3 +1,5 @@
+import Auth from './Auth';
+import { supabase } from './supabaseClient';
 import React, { useState, useEffect, useMemo, useRef, useContext } from "react";
 import { backupData, restoreData } from "./firebase";
 import {
@@ -63,6 +65,21 @@ export default function App() {
   const [currency, setCurrency] = useState(DEFAULT_CURRENCY);
   const [showSettings, setShowSettings] = useState(false);
   const [theme, setTheme] = useState("light");
+  const [session, setSession] = useState(null);
+
+useEffect(() => {
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    setSession(session);
+  });
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    setSession(session);
+  });
+  return () => subscription.unsubscribe();
+}, []);
+
+if (!session) {
+  return <Auth />;
+}
 
   useEffect(() => {
     (async () => {
