@@ -167,9 +167,6 @@ useEffect(() => {
     window.location.reload();
     return true;
     }
-if (!session) {
-  return <Auth />;
-}
   const [myStore, setMyStore] = useState(null);
 const [myRole, setMyRole] = useState(null);
 
@@ -203,6 +200,10 @@ useEffect(() => {
     }
   })();
 }, [session]);
+if (!session) {
+  return <Auth />;
+}
+  
   return (
     <CurrencyContext.Provider value={currency}>
     <div dir="rtl" lang="ar" data-theme={theme} style={styles.appShell}>
