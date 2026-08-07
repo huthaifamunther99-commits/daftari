@@ -77,10 +77,6 @@ useEffect(() => {
   return () => subscription.unsubscribe();
 }, []);
 
-if (!session) {
-  return <Auth />;
-}
-
   useEffect(() => {
     (async () => {
       try {
@@ -171,7 +167,9 @@ if (!session) {
     window.location.reload();
     return true;
     }
-
+if (!session) {
+  return <Auth />;
+}
   return (
     <CurrencyContext.Provider value={currency}>
     <div dir="rtl" lang="ar" data-theme={theme} style={styles.appShell}>
