@@ -182,11 +182,13 @@ useEffect(() => {
       setMyStore(memberships[0].store_id);
       setMyRole(memberships[0].role);
     } else {
-      const { data: newStore } = await supabase
-        .from('stores')
-        .insert({ name: 'محلي', owner_id: session.user.id })
-        .select()
-        .single();
+  const { data: newStore, error: storeErr } = await supabase
+    .from('stores')
+    .insert({ name: 'محلي', owner_id: session.user.id })
+    .select()
+    .single();
+
+  if (storeErr) alert('خطأ إنشاء المحل: ' + storeErr.message);
 
       if (newStore) {
         await supabase.from('store_members').insert({
