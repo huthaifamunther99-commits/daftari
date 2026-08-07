@@ -170,6 +170,39 @@ useEffect(() => {
 if (!session) {
   return <Auth />;
 }
+  const [myStore, setMyStore] = useState(null);
+const [myRole, setMyRole] = useState(null);
+
+useEffect(() => {
+  if (!session) return;
+  (async () => {
+    const { data: memberships } = await supabase
+      .from('store_members')
+      .select('store_id, role, stores(name)')
+      .eq('user_id', session.user.id);
+
+    if (memberships && memberships.length > 0) {
+      setMyStore(memberships[0].store_id);
+      setMyRole(memberships[0].role);
+    } else {
+      const { data: newStore } = await supabase
+        .from('stores')
+        .insert({ name: 'محلي', owner_id: session.user.id })
+        .select()
+        .single();
+
+      if (newStore) {
+        await supabase.from('store_members').insert({
+          store_id: newStore.id,
+          user_id: session.user.id,
+          role: 'admin',
+        });
+        setMyStore(newStore.id);
+        setMyRole('admin');
+      }
+    }
+  })();
+}, [session]);
   return (
     <CurrencyContext.Provider value={currency}>
     <div dir="rtl" lang="ar" data-theme={theme} style={styles.appShell}>
